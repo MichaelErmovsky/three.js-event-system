@@ -399,6 +399,9 @@
 		"misc_exporter_usdz",
 		"misc_lookat"
 	],
+	"Events": [
+		"events"
+	],
 	"css2d": [
 		"css2d_label"
 	],

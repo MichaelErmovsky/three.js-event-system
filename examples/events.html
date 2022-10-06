@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<title>three.js Events</title>
+	<link type="text/css" rel="stylesheet" href="main.css">
+	<style>
+		.label {
+			color: #FFF;
+			font-family: sans-serif;
+			padding: 2px;
+			background: rgba(0, 0, 0, .6);
+		}
+	</style>
+</head>
+<body>
+<div id="info"><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> css2d - label</div>
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js"
+				}
+			}
+
+
+
+
+</script>
+
+<script type="module">
+
+	import * as THREE from 'three';
+
+	import { OrbitControls } from './jsm/controls/OrbitControls.js';
+
+	let camera, scene, renderer;
+
+	init();
+	animate();
+
+	function init() {
+
+		camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 200 );
+		camera.position.set( 10, 5, 20 );
+		camera.layers.enableAll();
+		camera.layers.toggle( 1 );
+
+		scene = new THREE.Scene();
+
+		const dirLight = new THREE.DirectionalLight( 0xffffff );
+		dirLight.position.set( 0, 0, 1 );
+		dirLight.layers.enableAll();
+		scene.add( dirLight );
+
+		const axesHelper = new THREE.AxesHelper( 5 );
+		axesHelper.layers.enableAll();
+		scene.add( axesHelper );
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setPixelRatio( window.devicePixelRatio );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		document.body.appendChild( renderer.domElement );
+
+		const controls = new OrbitControls( camera, renderer.domElement );
+		controls.minDistance = 5;
+		controls.maxDistance = 100;
+
+		const parentBoxGeometry = new THREE.BoxGeometry( 0.5, 3, 0.5 );
+		const parentBoxMaterial = new THREE.MeshBasicMaterial( { color: 'green' } );
+
+		const parentBox = new THREE.Mesh( parentBoxGeometry, parentBoxMaterial );
+		scene.add( parentBox );
+		parentBox.addEventListener( 'test', ( event ) => {
+
+			console.log( event, 'PARENT' );
+
+		} );
+
+		const boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );
+		const boxMaterial = new THREE.MeshBasicMaterial( { color: 'pink' } );
+
+		const box = new THREE.Mesh( boxGeometry, boxMaterial );
+		box.addEventListener( 'test', ( event ) => {
+
+			console.log( event, 'CHILD FIRST LISTENER' );
+
+		} );
+		box.addEventListener( 'test', ( event ) => {
+
+			event.stopQueue();
+			event.stopBubbling();
+			console.log( event, 'CHILD SECOND PRIORITIZED' );
+
+		}, { priority: 1 } );
+
+		box.addEventListener( 'test', ( event ) => {
+
+			event.stopBubbling();
+			console.log( event, 'CHILD THIRD OVER PRIORITIZED' );
+
+		}, { priority: 2 } );
+
+		parentBox.add( box );
+
+
+		window.addEventListener( 'click', () => {
+
+			box.dispatchEvent( new THREE.Event( 'test', { param1: 'test' } ) );
+
+		} );
+		window.addEventListener( 'resize', onWindowResize );
+	}
+
+	function onWindowResize() {
+
+		camera.aspect = window.innerWidth / window.innerHeight;
+
+		camera.updateProjectionMatrix();
+
+		renderer.setSize( window.innerWidth, window.innerHeight );
+	}
+
+
+	function animate() {
+
+		requestAnimationFrame( animate );
+
+		renderer.render( scene, camera );
+	}
+
+</script>
+</body>
+</html>

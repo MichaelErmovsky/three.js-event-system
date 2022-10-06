@@ -197,55 +197,80 @@ const _SRGBAFormat = 1035; // fallback for WebGL 1
 /**
  * https://github.com/mrdoob/eventdispatcher.js/
  */
+class Event {
+	constructor(type, payload, options) {
+		this.type = type;
+		this.payload = payload;
+
+		if (options && options.bubbles) {
+			this.isBubblingStopped = true;
+		}
+	}
+
+	stopQueue() {
+		this.isQueueStopped = true;
+	}
+
+	stopBubbling() {
+		this.isBubblingStopped = true;
+	}
+
+}
+
 class EventDispatcher {
-	addEventListener(type, listener) {
-		if (this._listeners === undefined) this._listeners = {};
-		const listeners = this._listeners;
-
-		if (listeners[type] === undefined) {
-			listeners[type] = [];
-		}
-
-		if (listeners[type].indexOf(listener) === -1) {
-			listeners[type].push(listener);
-		}
+	constructor() {
+		this.listeners = new Map();
 	}
 
-	hasEventListener(type, listener) {
-		if (this._listeners === undefined) return false;
-		const listeners = this._listeners;
-		return listeners[type] !== undefined && listeners[type].indexOf(listener) !== -1;
+	addEventListener(type, callback, options) {
+		const typedListeners = this.listeners.get(type) || [];
+		const priority = options?.priority || 0;
+		const existingListener = typedListeners.findIndex(listener => listener.callback === callback);
+
+		if (existingListener === -1) {
+			typedListeners.push({
+				priority,
+				callback
+			});
+			typedListeners.sort((listenerA, listenerB) => listenerB.priority - listenerA.priority);
+		}
+
+		this.listeners.set(type, typedListeners);
 	}
 
-	removeEventListener(type, listener) {
-		if (this._listeners === undefined) return;
-		const listeners = this._listeners;
-		const listenerArray = listeners[type];
+	hasEventListener(type, callback) {
+		const typedListeners = this.listeners.get(type);
+		if (!typedListeners) return false;
+		return typedListeners.findIndex(listener => listener.callback === callback) !== -1;
+	}
 
-		if (listenerArray !== undefined) {
-			const index = listenerArray.indexOf(listener);
+	removeEventListener(type, callback) {
+		const typedListeners = this.listeners.get(type);
+		if (typedListeners === undefined) return;
+		const index = typedListeners.findIndex(listener => listener.callback === callback);
 
-			if (index !== -1) {
-				listenerArray.splice(index, 1);
-			}
+		if (index !== -1) {
+			typedListeners.splice(index, 1);
 		}
 	}
 
 	dispatchEvent(event) {
-		if (this._listeners === undefined) return;
-		const listeners = this._listeners;
-		const listenerArray = listeners[event.type];
+		let typedListeners = this.listeners.get(event.type) || [];
+		if (!event.target) event.target = this; // Make a copy, in case listeners are removed while iterating.
 
-		if (listenerArray !== undefined) {
-			event.target = this; // Make a copy, in case listeners are removed while iterating.
+		typedListeners = typedListeners.slice(0);
 
-			const array = listenerArray.slice(0);
-
-			for (let i = 0, l = array.length; i < l; i++) {
-				array[i].call(this, event);
+		for (let i = 0, l = typedListeners.length; i < l; i++) {
+			if (event.isQueueStopped) {
+				event.isQueueStopped = false;
+				break;
 			}
 
-			event.target = null;
+			typedListeners[i].callback.call(this, event);
+		}
+
+		if (this.parent && !event.isBubblingStopped) {
+			this.parent.dispatchEvent(event);
 		}
 	}
 
@@ -34213,15 +34238,15 @@ class PointLightHelper extends Mesh {
 		// TODO: delete this comment?
 		const distanceGeometry = new THREE.IcosahedronGeometry( 1, 2 );
 		const distanceMaterial = new THREE.MeshBasicMaterial( { color: hexColor, fog: false, wireframe: true, opacity: 0.1, transparent: true } );
-		this.lightSphere = new THREE.Mesh( bulbGeometry, bulbMaterial );
+			this.lightSphere = new THREE.Mesh( bulbGeometry, bulbMaterial );
 		this.lightDistance = new THREE.Mesh( distanceGeometry, distanceMaterial );
-		const d = light.distance;
-		if ( d === 0.0 ) {
-			this.lightDistance.visible = false;
-		} else {
-			this.lightDistance.scale.set( d, d, d );
-		}
-		this.add( this.lightDistance );
+			const d = light.distance;
+			if ( d === 0.0 ) {
+				this.lightDistance.visible = false;
+			} else {
+				this.lightDistance.scale.set( d, d, d );
+			}
+			this.add( this.lightDistance );
 		*/
 	}
 
@@ -34238,12 +34263,12 @@ class PointLightHelper extends Mesh {
 		}
 		/*
 		const d = this.light.distance;
-			if ( d === 0.0 ) {
-				this.lightDistance.visible = false;
-			} else {
-				this.lightDistance.visible = true;
+				if ( d === 0.0 ) {
+					this.lightDistance.visible = false;
+				} else {
+					this.lightDistance.visible = true;
 			this.lightDistance.scale.set( d, d, d );
-			}
+				}
 		*/
 
 	}
@@ -34731,7 +34756,7 @@ class BoxHelper extends LineSegments {
 		1/___0/|
 		| 6__|_7
 		2/___3/
-			0: max.x, max.y, max.z
+				0: max.x, max.y, max.z
 		1: min.x, max.y, max.z
 		2: min.x, min.y, max.z
 		3: max.x, min.y, max.z
@@ -35594,6 +35619,7 @@ exports.EqualStencilFunc = EqualStencilFunc;
 exports.EquirectangularReflectionMapping = EquirectangularReflectionMapping;
 exports.EquirectangularRefractionMapping = EquirectangularRefractionMapping;
 exports.Euler = Euler;
+exports.Event = Event;
 exports.EventDispatcher = EventDispatcher;
 exports.ExtrudeBufferGeometry = ExtrudeBufferGeometry;
 exports.ExtrudeGeometry = ExtrudeGeometry;
@@ -35891,3 +35917,4 @@ exports.ZeroSlopeEnding = ZeroSlopeEnding;
 exports.ZeroStencilOp = ZeroStencilOp;
 exports._SRGBAFormat = _SRGBAFormat;
 exports.sRGBEncoding = sRGBEncoding;
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoidGhyZWUuY2pzIiwic291cmNlcyI6W10sInNvdXJjZXNDb250ZW50IjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiJ9
